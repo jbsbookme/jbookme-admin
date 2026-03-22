@@ -4,6 +4,7 @@ export const COLLECTIONS = {
   barbers: "barbers",
   services: "services",
   gallery: "gallery",
+  categories: "categories",
   bookings: "bookings",
 } as const;
 

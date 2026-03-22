@@ -7,12 +7,14 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import { auth, db, uploadFile } from "@/lib/firebase";
 import { COLLECTIONS } from "@/lib/collections";
-import type { Barber, BarberRole } from "@/lib/types";
+import type { Barber, BarberRole, Category, CategoryKey } from "@/lib/types";
 
 type BarberRecord = Barber & { id: string };
 
@@ -23,11 +25,30 @@ const emptyForm: Barber = {
   photoUrl: "",
 };
 
+const CATEGORY_DEFAULTS: Record<CategoryKey, Category> = {
+  men: {
+    label: "Men",
+    imageUrl: "",
+    type: "BARBER",
+  },
+  women: {
+    label: "Women",
+    imageUrl: "",
+    type: "STYLIST",
+  },
+};
+
 export default function BarbersPage() {
   const [barbers, setBarbers] = useState<BarberRecord[]>([]);
   const [form, setForm] = useState<Barber>(emptyForm);
   const [role, setRole] = useState<BarberRole>("BARBER");
   const [category, setCategory] = useState<"men" | "women">("men");
+  const [categories, setCategories] = useState<Record<CategoryKey, Category>>(
+    CATEGORY_DEFAULTS
+  );
+  const [categoryUploading, setCategoryUploading] = useState<CategoryKey | null>(
+    null
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -46,6 +67,43 @@ export default function BarbersPage() {
     );
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, COLLECTIONS.categories),
+      (snapshot) => {
+        const next: Record<CategoryKey, Category> = {
+          ...CATEGORY_DEFAULTS,
+        };
+        snapshot.docs.forEach((docSnap) => {
+          const key = docSnap.id as CategoryKey;
+          if (!(key in next)) return;
+          next[key] = {
+            ...next[key],
+            ...(docSnap.data() as Category),
+          };
+        });
+        setCategories(next);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const ensureCategories = async () => {
+      await Promise.all(
+        (Object.keys(CATEGORY_DEFAULTS) as CategoryKey[]).map(async (key) => {
+          const ref = doc(db, COLLECTIONS.categories, key);
+          const existing = await getDoc(ref);
+          if (existing.exists()) return;
+          await setDoc(ref, CATEGORY_DEFAULTS[key]);
+        })
+      );
+    };
+
+    void ensureCategories();
   }, []);
 
   const handleFileChange = async (
@@ -164,6 +222,38 @@ export default function BarbersPage() {
     await updateDoc(doc(db, COLLECTIONS.barbers, barber.id), {
       isActive: !barber.isActive,
     });
+  };
+
+  const handleCategoryImageChange = async (
+    key: CategoryKey,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setCategoryUploading(key);
+    try {
+      const imageUrl = await uploadFile(file, "categories");
+      await setDoc(
+        doc(db, COLLECTIONS.categories, key),
+        {
+          ...CATEGORY_DEFAULTS[key],
+          imageUrl,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      setCategories((prev) => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          imageUrl,
+        },
+      }));
+    } finally {
+      setCategoryUploading(null);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -394,6 +484,65 @@ export default function BarbersPage() {
               ))
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/40">
+            Category Settings
+          </p>
+          <h3 className="mt-2 text-lg font-semibold text-white">
+            Men y Women
+          </h3>
+          <p className="mt-2 text-sm text-white/60">
+            Actualiza las imagenes que se muestran en el booking de la app.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {(Object.keys(CATEGORY_DEFAULTS) as CategoryKey[]).map((key) => {
+            const data = categories[key];
+            return (
+              <div
+                key={key}
+                className="space-y-3 rounded-3xl border border-white/10 bg-black/30 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{data.label}</p>
+                    <p className="text-xs text-white/50">{data.type}</p>
+                  </div>
+                </div>
+                {data.imageUrl ? (
+                  <div className="relative h-36 w-full overflow-hidden rounded-2xl">
+                    <Image
+                      src={data.imageUrl}
+                      alt={data.label}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-36 items-center justify-center rounded-2xl border border-white/10 text-xs text-white/50">
+                    Sin imagen
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => handleCategoryImageChange(key, event)}
+                  disabled={categoryUploading === key}
+                  className="block w-full text-sm text-white/70 file:mr-4 file:rounded-full file:border-0 file:bg-emerald-400/90 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-black disabled:cursor-not-allowed disabled:opacity-50 file:disabled:cursor-not-allowed file:disabled:opacity-70"
+                />
+                {categoryUploading === key ? (
+                  <div className="text-xs text-emerald-400">
+                    Subiendo imagen...
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

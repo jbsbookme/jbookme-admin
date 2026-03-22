@@ -2,6 +2,8 @@ export type UserRole = "admin" | "staff" | "customer";
 
 export type BarberRole = "BARBER" | "STYLIST";
 
+export type CategoryKey = "men" | "women";
+
 export type Shop = {
   name: string;
   address: string;
@@ -21,9 +23,16 @@ export type Barber = {
   bio?: string;
   isActive: boolean;
   role?: BarberRole;
-  category?: "men" | "women";
+  category?: CategoryKey;
   photoUrl?: string;
   createdAt?: string;
+};
+
+export type Category = {
+  label: string;
+  imageUrl?: string;
+  type: BarberRole;
+  updatedAt?: string;
 };
 
 export type Service = {
