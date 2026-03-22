@@ -26,6 +26,12 @@ type ServiceDoc = {
   name?: string;
 };
 
+type UserDoc = {
+  name?: string;
+  displayName?: string;
+  fullName?: string;
+};
+
 type AppointmentDoc = Omit<Partial<Booking>, "date" | "status"> & {
   date?: string | Date | { toDate?: () => Date; seconds?: number };
   status?: string;
@@ -52,6 +58,7 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [barberNames, setBarberNames] = useState<NameMap>({});
   const [serviceNames, setServiceNames] = useState<NameMap>({});
+  const [userNames, setUserNames] = useState<NameMap>({});
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -87,6 +94,23 @@ export default function BookingsPage() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
+      collection(db, COLLECTIONS.users),
+      (snapshot) => {
+        const next: NameMap = {};
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as UserDoc;
+          next[docSnap.id] =
+            data.name ?? data.displayName ?? data.fullName ?? "Sin nombre";
+        });
+        setUserNames(next);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
       collection(db, "appointments"),
       (snapshot) => {
         const next = snapshot.docs.map((docSnap) => {
@@ -97,9 +121,14 @@ export default function BookingsPage() {
             data.status === "cancelled"
               ? data.status
               : "pending";
+          const resolvedCustomerName =
+            data.customerName ??
+            (data.userId ? userNames[data.userId] : "") ??
+            "";
+
           return {
             id: docSnap.id,
-            customerName: data.customerName ?? "",
+            customerName: resolvedCustomerName,
             serviceName:
               data.serviceName ??
               (data.serviceId ? serviceNames[data.serviceId] : "") ??
@@ -121,7 +150,7 @@ export default function BookingsPage() {
     );
 
     return () => unsubscribe();
-  }, [barberNames, serviceNames]);
+  }, [barberNames, serviceNames, userNames]);
 
   const sortedBookings = useMemo(
     () =>
