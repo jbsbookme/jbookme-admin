@@ -21,6 +21,7 @@ export type Barber = {
   bio?: string;
   isActive: boolean;
   role?: BarberRole;
+  category?: "men" | "women";
   photoUrl?: string;
   createdAt?: string;
 };
