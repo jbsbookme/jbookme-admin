@@ -26,18 +26,23 @@ type ServiceDoc = {
   name?: string;
 };
 
-type AppointmentDoc = Partial<Booking> & {
+type AppointmentDoc = Omit<Partial<Booking>, "date" | "status"> & {
   date?: string | Date | { toDate?: () => Date; seconds?: number };
+  status?: string;
 };
 
 const resolveDateLabel = (value?: AppointmentDoc["date"]) => {
   if (!value) return "Sin fecha";
   if (typeof value === "string") return value;
-  if (value instanceof Date) return value.toISOString();
   if (typeof value === "object") {
-    if (typeof value.toDate === "function") return value.toDate().toISOString();
-    if (typeof value.seconds === "number") {
+    if ("toDate" in value && typeof value.toDate === "function") {
+      return value.toDate().toISOString();
+    }
+    if ("seconds" in value && typeof value.seconds === "number") {
       return new Date(value.seconds * 1000).toISOString();
+    }
+    if ("getTime" in value && typeof value.getTime === "function") {
+      return new Date(value.getTime()).toISOString();
     }
   }
   return "Sin fecha";
