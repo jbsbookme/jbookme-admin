@@ -48,8 +48,17 @@ export type Service = {
 
 export type GalleryItem = {
   imageUrl: string;
+  barberId?: string;
+  barberName?: string;
+  role?: BarberRole;
+  category?: CategoryKey;
+  mediaType?: "image" | "video";
+  cloudinaryPublicId?: string;
   storagePath?: string;
   createdAt?: string;
+  likesCount?: number;
+  ratingAverage?: number;
+  popularityScore?: number;
 };
 
 export type BookingStatus = "pending" | "completed" | "cancelled";
