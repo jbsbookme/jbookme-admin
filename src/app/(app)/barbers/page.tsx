@@ -27,6 +27,7 @@ export default function BarbersPage() {
   const [barbers, setBarbers] = useState<BarberRecord[]>([]);
   const [form, setForm] = useState<Barber>(emptyForm);
   const [role, setRole] = useState<BarberRole>("BARBER");
+  const [category, setCategory] = useState<"men" | "women">("men");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -108,7 +109,7 @@ export default function BarbersPage() {
     setSaving(true);
     setError(null);
     try {
-      const payload = { ...form, role };
+      const payload = { ...form, role, category };
       if (editingId) {
         console.log(`[barbers] Guardando cambios del barbero: ${editingId}`);
         await updateDoc(doc(db, COLLECTIONS.barbers, editingId), payload);
@@ -123,6 +124,7 @@ export default function BarbersPage() {
       console.log("[barbers] ¡Guardado con éxito!");
       setForm(emptyForm);
       setRole("BARBER");
+      setCategory("men");
       setEditingId(null);
     } catch (error) {
       console.log("[barbers] Falló el guardado:", error);
@@ -141,6 +143,11 @@ export default function BarbersPage() {
       photoUrl: barber.photoUrl ?? "",
     });
     setRole(barber.role ?? "BARBER");
+    setCategory(
+      barber.category === "women" || barber.category === "men"
+        ? barber.category
+        : "men"
+    );
   };
 
   const handleDelete = async (id: string) => {
@@ -260,6 +267,35 @@ export default function BarbersPage() {
               </div>
             ) : null}
           </div>
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+              Category
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCategory("men")}
+                className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                  category === "men"
+                    ? "bg-emerald-400/90 text-black"
+                    : "border border-white/20 text-white/70"
+                }`}
+              >
+                Men
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategory("women")}
+                className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                  category === "women"
+                    ? "bg-rose-300 text-black"
+                    : "border border-white/20 text-white/70"
+                }`}
+              >
+                Women
+              </button>
+            </div>
+          </div>
           <div className="flex gap-3">
             <button
               type="button"
@@ -276,6 +312,7 @@ export default function BarbersPage() {
                   setEditingId(null);
                   setForm(emptyForm);
                   setRole("BARBER");
+                  setCategory("men");
                 }}
                 className="rounded-2xl border border-white/20 px-4 py-3 text-sm text-white/70"
               >
@@ -326,6 +363,7 @@ export default function BarbersPage() {
                       <p className="text-xs text-white/50">
                         {barber.isActive ? "Activo" : "Inactivo"}
                         {barber.role ? ` · ${barber.role}` : ""}
+                        {barber.category ? ` · ${barber.category}` : ""}
                       </p>
                     </div>
                   </div>
