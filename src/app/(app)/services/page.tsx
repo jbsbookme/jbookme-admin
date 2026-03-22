@@ -22,6 +22,7 @@ const emptyForm: Service = {
   price: 0,
   duration: 0,
   category: "men",
+  role: "BARBER",
   imageUrl: "",
   description: "",
 };
@@ -31,6 +32,7 @@ export default function ServicesPage() {
   const [form, setForm] = useState<Service>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [backfillNote, setBackfillNote] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -64,8 +66,11 @@ export default function ServicesPage() {
     if (!form.name.trim()) return;
     setSaving(true);
 
+    const resolvedRole =
+      form.role ?? (form.category === "women" ? "STYLIST" : "BARBER");
     const payload = {
       ...form,
+      role: resolvedRole,
       price: Number(form.price),
       duration: Number(form.duration),
     };
@@ -91,6 +96,7 @@ export default function ServicesPage() {
       price: service.price ?? 0,
       duration: service.duration ?? 0,
       category: service.category ?? "men",
+      role: service.role ?? (service.category === "women" ? "STYLIST" : "BARBER"),
       imageUrl: service.imageUrl ?? "",
       description: service.description ?? "",
     });
@@ -98,6 +104,41 @@ export default function ServicesPage() {
 
   const handleDelete = async (id: string) => {
     await deleteDoc(doc(db, COLLECTIONS.services, id));
+  };
+
+  const handleBackfill = async () => {
+    setSaving(true);
+    setBackfillNote(null);
+    let updatedCount = 0;
+
+    await Promise.all(
+      services.map(async (service) => {
+        const nextCategory =
+          service.category ??
+          (service.role ? (service.role === "STYLIST" ? "women" : "men") : undefined);
+        const nextRole =
+          service.role ??
+          (nextCategory ? (nextCategory === "women" ? "STYLIST" : "BARBER") : undefined);
+
+        if (!nextCategory && !nextRole) return;
+
+        const payload: Partial<Service> & { updatedAt: string } = {
+          updatedAt: new Date().toISOString(),
+        };
+        if (nextCategory) payload.category = nextCategory;
+        if (nextRole) payload.role = nextRole;
+
+        await updateDoc(doc(db, COLLECTIONS.services, service.id), payload);
+        updatedCount += 1;
+      })
+    );
+
+    setBackfillNote(
+      updatedCount > 0
+        ? `Actualizados ${updatedCount} servicios.`
+        : "No hubo servicios para actualizar."
+    );
+    setSaving(false);
   };
 
   return (
@@ -150,6 +191,24 @@ export default function ServicesPage() {
                 <option value="women">Women</option>
               </select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+              Rol
+            </label>
+            <select
+              value={form.role ?? "BARBER"}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  role: event.target.value as NonNullable<Service["role"]>,
+                }))
+              }
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/60"
+            >
+              <option value="BARBER">Barber</option>
+              <option value="STYLIST">Stylist</option>
+            </select>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -245,6 +304,25 @@ export default function ServicesPage() {
               </button>
             ) : null}
           </div>
+          <div className="space-y-2 rounded-2xl border border-white/10 bg-black/30 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-white/50">
+              Mantenimiento
+            </p>
+            <p className="text-sm text-white/60">
+              Rellena categoria/rol faltante usando lo que exista en cada servicio.
+            </p>
+            <button
+              type="button"
+              onClick={handleBackfill}
+              disabled={saving}
+              className="rounded-2xl border border-white/20 px-4 py-2 text-sm text-white/70 transition hover:border-emerald-300/50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Actualizando..." : "Actualizar campos faltantes"}
+            </button>
+            {backfillNote ? (
+              <p className="text-xs text-white/50">{backfillNote}</p>
+            ) : null}
+          </div>
         </div>
 
         <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -281,7 +359,7 @@ export default function ServicesPage() {
                         {service.name}
                       </p>
                       <p className="text-xs text-white/50">
-                        {service.category} - ${service.price} - {service.duration}m
+                        {service.category} • {service.role ?? (service.category === "women" ? "STYLIST" : "BARBER")} • ${service.price} - {service.duration}m
                       </p>
                     </div>
                   </div>

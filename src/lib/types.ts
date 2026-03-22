@@ -39,7 +39,8 @@ export type Service = {
   name: string;
   price: number;
   duration: number;
-  category: "men" | "women";
+  category: CategoryKey;
+  role?: BarberRole;
   imageUrl?: string;
   description?: string;
   createdAt?: string;
