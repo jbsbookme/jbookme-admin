@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
         hostname: "bookme-65bd5.firebasestorage.app",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
     ],
   },
 };
