@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { COLLECTIONS } from "@/lib/collections";
@@ -10,33 +10,127 @@ type BookingRecord = Booking & { id: string };
 
 const statusLabels: Record<BookingStatus, string> = {
   pending: "Pendiente",
+  confirmed: "Confirmada",
   completed: "Completada",
   cancelled: "Cancelada",
 };
 
+type NameMap = Record<string, string>;
+
+type BarberDoc = {
+  name?: string;
+  user?: { name?: string };
+};
+
+type ServiceDoc = {
+  name?: string;
+};
+
+type AppointmentDoc = Partial<Booking> & {
+  date?: string | Date | { toDate?: () => Date; seconds?: number };
+};
+
+const resolveDateLabel = (value?: AppointmentDoc["date"]) => {
+  if (!value) return "Sin fecha";
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") {
+    if (typeof value.toDate === "function") return value.toDate().toISOString();
+    if (typeof value.seconds === "number") {
+      return new Date(value.seconds * 1000).toISOString();
+    }
+  }
+  return "Sin fecha";
+};
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
+  const [barberNames, setBarberNames] = useState<NameMap>({});
+  const [serviceNames, setServiceNames] = useState<NameMap>({});
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, COLLECTIONS.bookings),
+      collection(db, COLLECTIONS.barbers),
       (snapshot) => {
-        const next = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Booking),
-        }));
-        setBookings(next);
+        const next: NameMap = {};
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as BarberDoc;
+          next[docSnap.id] = data.name ?? data.user?.name ?? "Sin nombre";
+        });
+        setBarberNames(next);
       }
     );
 
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, COLLECTIONS.services),
+      (snapshot) => {
+        const next: NameMap = {};
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as ServiceDoc;
+          next[docSnap.id] = data.name ?? "Servicio";
+        });
+        setServiceNames(next);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "appointments"),
+      (snapshot) => {
+        const next = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as AppointmentDoc;
+          const status =
+            data.status === "confirmed" ||
+            data.status === "completed" ||
+            data.status === "cancelled"
+              ? data.status
+              : "pending";
+          return {
+            id: docSnap.id,
+            customerName: data.customerName ?? "",
+            serviceName:
+              data.serviceName ??
+              (data.serviceId ? serviceNames[data.serviceId] : "") ??
+              "No definido",
+            barberName:
+              data.barberName ??
+              (data.barberId ? barberNames[data.barberId] : "") ??
+              "Asignar",
+            date: resolveDateLabel(data.date),
+            status,
+            notes: data.notes,
+            barberId: data.barberId,
+            serviceId: data.serviceId,
+            userId: data.userId,
+          } as BookingRecord;
+        });
+        setBookings(next);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [barberNames, serviceNames]);
+
+  const sortedBookings = useMemo(
+    () =>
+      [...bookings].sort((a, b) =>
+        (b.date ?? "").localeCompare(a.date ?? "")
+      ),
+    [bookings]
+  );
+
   const handleStatusChange = async (
     id: string,
     status: BookingStatus
   ) => {
-    await updateDoc(doc(db, COLLECTIONS.bookings, id), { status });
+    await updateDoc(doc(db, "appointments", id), { status });
   };
 
   return (
@@ -57,7 +151,7 @@ export default function BookingsPage() {
             Aun no hay citas registradas.
           </div>
         ) : (
-          bookings.map((booking) => (
+          sortedBookings.map((booking) => (
             <div
               key={booking.id}
               className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 md:grid-cols-[1.2fr_1fr_1fr_0.6fr]"
@@ -67,7 +161,7 @@ export default function BookingsPage() {
                   Cliente
                 </p>
                 <p className="mt-2 text-sm font-semibold text-white">
-                  {booking.customerName || "Sin nombre"}
+                  {booking.customerName || booking.userId || "Sin nombre"}
                 </p>
                 <p className="text-xs text-white/50">{booking.notes}</p>
               </div>

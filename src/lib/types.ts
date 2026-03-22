@@ -61,7 +61,7 @@ export type GalleryItem = {
   popularityScore?: number;
 };
 
-export type BookingStatus = "pending" | "completed" | "cancelled";
+export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
 export type Booking = {
   customerName: string;
@@ -70,4 +70,7 @@ export type Booking = {
   date: string;
   status: BookingStatus;
   notes?: string;
+  barberId?: string;
+  serviceId?: string;
+  userId?: string;
 };
