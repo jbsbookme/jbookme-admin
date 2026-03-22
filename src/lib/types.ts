@@ -1,5 +1,7 @@
 export type UserRole = "admin" | "staff" | "customer";
 
+export type BarberRole = "BARBER" | "STYLIST";
+
 export type Shop = {
   name: string;
   address: string;
@@ -18,6 +20,7 @@ export type Barber = {
   name: string;
   bio?: string;
   isActive: boolean;
+  role?: BarberRole;
   photoUrl?: string;
   createdAt?: string;
 };

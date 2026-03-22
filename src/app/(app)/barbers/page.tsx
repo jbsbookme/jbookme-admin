@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { auth, db, uploadFile } from "@/lib/firebase";
 import { COLLECTIONS } from "@/lib/collections";
-import type { Barber } from "@/lib/types";
+import type { Barber, BarberRole } from "@/lib/types";
 
 type BarberRecord = Barber & { id: string };
 
@@ -26,6 +26,7 @@ const emptyForm: Barber = {
 export default function BarbersPage() {
   const [barbers, setBarbers] = useState<BarberRecord[]>([]);
   const [form, setForm] = useState<Barber>(emptyForm);
+  const [role, setRole] = useState<BarberRole>("BARBER");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -107,19 +108,21 @@ export default function BarbersPage() {
     setSaving(true);
     setError(null);
     try {
+      const payload = { ...form, role };
       if (editingId) {
         console.log(`[barbers] Guardando cambios del barbero: ${editingId}`);
-        await updateDoc(doc(db, COLLECTIONS.barbers, editingId), form);
+        await updateDoc(doc(db, COLLECTIONS.barbers, editingId), payload);
       } else {
         console.log("[barbers] Creando nuevo barbero en Firestore...");
         await addDoc(collection(db, COLLECTIONS.barbers), {
-          ...form,
+          ...payload,
           createdAt: new Date().toISOString(),
         });
       }
 
       console.log("[barbers] ¡Guardado con éxito!");
       setForm(emptyForm);
+      setRole("BARBER");
       setEditingId(null);
     } catch (error) {
       console.log("[barbers] Falló el guardado:", error);
@@ -137,6 +140,7 @@ export default function BarbersPage() {
       isActive: barber.isActive ?? true,
       photoUrl: barber.photoUrl ?? "",
     });
+    setRole(barber.role ?? "BARBER");
   };
 
   const handleDelete = async (id: string) => {
@@ -217,6 +221,19 @@ export default function BarbersPage() {
           </div>
           <div className="space-y-2">
             <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+              Rol
+            </label>
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value as BarberRole)}
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/60"
+            >
+              <option value="BARBER">BARBER</option>
+              <option value="STYLIST">STYLIST</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.2em] text-white/50">
               Foto
             </label>
             <input
@@ -258,6 +275,7 @@ export default function BarbersPage() {
                 onClick={() => {
                   setEditingId(null);
                   setForm(emptyForm);
+                  setRole("BARBER");
                 }}
                 className="rounded-2xl border border-white/20 px-4 py-3 text-sm text-white/70"
               >
@@ -307,6 +325,7 @@ export default function BarbersPage() {
                       </p>
                       <p className="text-xs text-white/50">
                         {barber.isActive ? "Activo" : "Inactivo"}
+                        {barber.role ? ` · ${barber.role}` : ""}
                       </p>
                     </div>
                   </div>
